@@ -50,8 +50,7 @@ def img_crop(img,crop_size,cor=(0,0),img_or_label=True):
         return img, cor
     else:
         return img
-
-
+#sss
 crop=(300,300)
 img=Image.open('/home/gshdong/deeplab_demo/VOCdevkit/VOC2012/JPEGImages/2007_002212.jpg')
 label=Image.open('/home/gshdong/deeplab_demo/VOCdevkit/VOC2012/SegmentationClass/2007_002212.png').convert('RGB')
