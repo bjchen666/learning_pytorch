@@ -47,21 +47,6 @@ def img_crop(img,crop_size,cor=(0,0),img_or_label=True):
     else:
         return img
 
-# im=Image.open('VOCdevkit/VOC2012/JPEGImages/2007_000033.jpg')
-# im,cor = MyRandomCrop((320,480))(im)
-# im2=Image.open('VOCdevkit/VOC2012/SegmentationClass/2007_000033.png').convert('RGB')
-# im2=FixedCrop(cor[0],cor[1],320,480)(im2)
-# im3=Image.open('VOCdevkit/VOC2012/JPEGImages/2007_000480.jpg')
-# im3,cor = MyRandomCrop((320,480))(im3)
-# im4=Image.open('VOCdevkit/VOC2012/SegmentationClass/2007_000480.png').convert('RGB')
-# im4=FixedCrop(cor[0],cor[1],320,480)(im4)
-# _,test=plt.subplots(2,2)
-# test[0][0].imshow(im)
-# test[0][1].imshow(im2)
-# test[1][0].imshow(im3)
-# test[1][1].imshow(im4)
-#plt.show()
-
 classes = ['background','aeroplane','bicycle','bird','boat',
            'bottle','bus','car','cat','chair','cow','diningtable',
            'dog','horse','motorbike','person','potted plant',
@@ -127,9 +112,6 @@ eval_data=DataLoader(eval_set,shuffle=False,batch_size=32,num_workers=6)
 pretrain=models.resnet34(pretrained=True)
 
 def bilinear_kernel(in_channels, out_channels, kernel_size):
-    '''
-    return a bilinear filter tensor
-    '''
     factor = (kernel_size + 1) // 2
     if kernel_size % 2 == 1:
         center = factor - 1
@@ -141,7 +123,6 @@ def bilinear_kernel(in_channels, out_channels, kernel_size):
     weight[range(in_channels), range(out_channels), :, :] = filt
     return torch.from_numpy(weight)
 
-
 class fcn(nn.Module):
     def __init__(self,class_nums):
         super(fcn, self).__init__()
@@ -149,83 +130,21 @@ class fcn(nn.Module):
         self.block2=nn.Sequential(nn.Conv2d(512,class_nums,1))
         self.block3 = nn.ConvTranspose2d(class_nums, class_nums, 64, stride=32, padding=16, bias=False)
         self.block3.weight.data = bilinear_kernel(class_nums, class_nums, 64)
-        # self.block3=nn.ConvTranspose2d(class_nums,class_nums,16,8,4,bias=False)
-        # self.block3.weight.data = bilinear_kernel(class_nums, class_nums, 16)
-        # self.block4=nn.ConvTranspose2d(class_nums,class_nums,4,2,1,bias=False)
-        # self.block4.weight.data = bilinear_kernel(class_nums, class_nums, 4)
-        # self.block5=nn.ConvTranspose2d(class_nums,class_nums,4,2,1,bias=False)
-        # self.block5.weight.data = bilinear_kernel(class_nums, class_nums, 4)
 
     def forward(self,x):
         x=self.block1(x)
         x=self.block2(x)
         x = self.block3(x)
-        # x=self.block3(x)
-        # x=self.block4(x)
-        # x=self.block5(x)
         return x
 
-'''
-class fcn(nn.Module):
-    def __init__(self, num_classes):
-        super(fcn, self).__init__()
-
-        self.stage1 = nn.Sequential(*list(pretrain.children())[:-4])
-        self.stage2 = list(pretrain.children())[-4]
-        self.stage3 = list(pretrain.children())[-3]
-
-        self.scores1 = nn.Conv2d(512, num_classes, 1)
-        self.scores2 = nn.Conv2d(256, num_classes, 1)
-        self.scores3 = nn.Conv2d(128, num_classes, 1)
-
-        self.upsample_8x = nn.ConvTranspose2d(num_classes, num_classes, 16, 8, 4, bias=False)
-        self.upsample_8x.weight.data = bilinear_kernel(num_classes, num_classes, 16)
-
-        self.upsample_4x = nn.ConvTranspose2d(num_classes, num_classes, 4, 2, 1, bias=False)
-        self.upsample_4x.weight.data = bilinear_kernel(num_classes, num_classes, 4)
-
-        self.upsample_2x = nn.ConvTranspose2d(num_classes, num_classes, 4, 2, 1, bias=False)
-        self.upsample_2x.weight.data = bilinear_kernel(num_classes, num_classes, 4)
-
-    def forward(self, x):
-        x = self.stage1(x)
-        s1 = x  # 1/8
-
-        x = self.stage2(x)
-        s2 = x  # 1/16
-
-        x = self.stage3(x)
-        s3 = x  # 1/32
-
-        s3 = self.scores1(s3)
-        s3 = self.upsample_2x(s3)
-        s2 = self.scores2(s2)
-        s2 = s2 + s3
-
-        s1 = self.scores3(s1)
-        s2 = self.upsample_4x(s2)
-        s = s1 + s2
-
-        s = self.upsample_8x(s)
-        return s
-'''
 net=fcn(21).cuda()
 
 optimizer=torch.optim.SGD(net.parameters(),lr=0.1,weight_decay=0.0001)
 criterion=nn.NLLLoss()
 
-epoch=10
+epoch=30
 
-# def acc_nums(img,label):
-#     nums=0
-#     for i in range(img.shape[0]):
-#         for j in range(img.shape[1]):
-#             for k in range(img.shape[2]):
-#                 if img[i,j,k]==label[i,j,k]:
-#                     nums+=1
-#     return nums
-
-'''
+# '''
 for e in range(epoch):
     train_acc=0
     train_loss=0
@@ -233,9 +152,13 @@ for e in range(epoch):
     for im,label in train_data:
         im=Variable(im).cuda()
         label=Variable(label).cuda()
+        print 'label',label.type()
+        print 'image',im.type()
         out=net(im)
+        print 'out',out.type()
         predit = out.data.max(1)[1]
         score = NF.log_softmax(out, dim=1)
+        print 'scores',score.type()
         loss=criterion(score,label)
         optimizer.zero_grad()
         loss.backward()
@@ -255,7 +178,7 @@ for e in range(epoch):
     print 'echo:{},train_acc:{},train_loss:{},eval:{}'.format(e,int(train_acc)*1.0/(320*480*len(train_set)),train_loss/len(train_data),int(eval_acc)*1.0/(320*480*len(eval_set)))
 
 torch.save(net.state_dict(),'fcn_chuchao_crop_myself.pth')
-'''
+# '''
 
 ## display by multitle
 # net.load_state_dict(torch.load('fcn_chuchao.pth'))

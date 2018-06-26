@@ -16,7 +16,7 @@ import numbers
 import torchvision.transforms.functional as F
 import torch.nn.functional as NF
 
-epochs=20
+epochs=5
 crop_size=(320,480)
 class_nums=21
 batch_sizes=16
@@ -157,16 +157,25 @@ class fcn(nn.Module):
         x = self.bilinear(x)
         return x
 
+net=fcn(class_nums).cuda()
+
 train_set=MyDataSet(train=True,transform=img_aug)
 train_data=DataLoader(train_set,batch_size=batch_sizes,shuffle=True,num_workers=6)
 test_set=MyDataSet(train=False,transform=img_aug)
 test_data=DataLoader(test_set,batch_size=batch_sizes,shuffle=True)
 
-net=fcn(class_nums).cuda()
+epochs_add=0
+
+# if os.path.exists('checkpoint.pth.tar'):
+#     checkpoint=torch.load('checkpoint.pth.tar')
+#     net.load_state_dict(checkpoint['model_state_dict'])
+#     epochs_add=checkpoint['epochs']+1
+
 optimizer=torch.optim.SGD(net.parameters(),lr=learn_rate,weight_decay=0.0001)
 criterion=nn.NLLLoss()
+
 # '''
-for e in range(epochs):
+for e in range(epochs_add,epochs):
     acc_train=0
     miou_train=0
     loss_train=0
@@ -197,9 +206,24 @@ for e in range(epochs):
         eval_acc += (predit.data == label.data).sum()
         miou = [iou_calculate(i, j, class_nums) for i, j in zip(predit.cpu().numpy(), label.cpu().numpy())]
         miou_test += np.array(miou).mean()
-    
-    print 'Epoch:{},acc_train:{},miou_train:{},loss_train:{},eval_acc:{},miou_test:{}'.format(e,int(acc_train)*1.0/(320*480*len(train_set)),miou_train/len(train_data),loss_train/len(train_set),int(eval_acc)*1.0/(320*480*len(test_set)),miou_test/len(test_data))
-torch.save(net.state_dict(),'fcn_vgg16_fuse_crop_index_myself.pth')
+
+    acc_train = int(acc_train) * 1.0 / (320 * 480 * len(train_set))
+    eval_acc=int(eval_acc)*1.0/(320*480*len(test_set))
+    miou_train=miou_train/len(train_data)
+    miou_test=miou_test/len(test_data)
+
+    print 'Epoch:{},acc_train:{},miou_train:{},loss_train:{},eval_acc:{},miou_test:{}'.format(e,acc_train,miou_train,loss_train/len(train_set),eval_acc,miou_test)
+
+    # torch.save({
+    #     'epochs':e,
+    #     'model_state_dict':net.state_dict(),
+    #     'acc_train':acc_train,
+    #     'acc_test':eval_acc,
+    #     'miou_train':miou_train,
+    #     'miou_test': miou_test
+    # },'checkpoint.pth.tar')
+
+# torch.save(net.state_dict(),'fcn_vgg16_fuse_crop_index_myself.pth')
 # '''
 
 #
